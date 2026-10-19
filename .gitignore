@@ -1,0 +1,19 @@
+# Compiled C++ files
+*.o
+*.out
+*.exe
+*.obj
+
+# macOS files
+.DS_Store
+
+# Build folders
+build/
+debug/
+release/
+
+# Executable
+ray-tracer
+
+# VS Code temporary files
+.vscode/*.log
