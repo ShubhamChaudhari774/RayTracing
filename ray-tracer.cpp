@@ -46,8 +46,9 @@ int main()
   Triangle triangle2 = Triangle{Vector3{1, 1, .5}, Vector3{-1, -1, -.5}, Vector3{1, -1, .5}};
 
   vector<Triangle> triangles = {triangle, triangle2};
-
-  Vector3 background_color = Vector3{150, 0, 255};
+ 
+  
+  Vector3 background_color = Vector3{16, 27, 56};
 
   /// Loop over each line doing down
   for (int y = 0; y < h; y++)
@@ -133,8 +134,8 @@ int main()
           // I'm in the triangle
           closest_t = t;
 
-          r = 255 * u + 0 * v + 255 * a;
-          g = 255 * u + 255 * v + 0 * a;
+          r = 255 * u + 255 * v + 255 * a;
+          g = 140 * u + 0 * v + 255 * a;
           b = 0 * u + 0 * v + 0 * a;
         }
       }
