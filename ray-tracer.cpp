@@ -15,12 +15,58 @@ int main()
 {
 
   ///Demonstrate file_util
-  vector<string> lines = readLines("simple.obj");
+  vector<string> lines = readLines("cube.obj");
+  vector<Vector3> vertices;
+  vector<Triangle> triangles;
+
   for(const string& line : lines){
-    cout << line << endl;
     vector<string> parts = split(line, ' ');
-    cout << parts[0] << endl;
+    if(parts.empty()) continue;
+
+    // ADDED: Read vertex coordinates
+    if(parts[0] == "v" && parts.size() >= 4){
+      vertices.push_back(Vector3{stof(parts[1]), stof(parts[2]), stof(parts[3])});
+    }
+
+    // ADDED: Texture coordinates are not needed
+    if(parts[0] == "vt"){
+      continue;
+    }
+
+    // ADDED: Normals are calculated in the ray tracer
+    if(parts[0] == "vn"){
+      continue;
+    }
+
+    // ADDED: Convert OBJ faces into triangles
+    if(parts[0] == "f"){
+      vector<int> face;
+
+      for(size_t i = 1; i < parts.size(); i++){
+        if(parts[i].empty()) continue;
+
+        vector<string> indices = split(parts[i], '/');
+        int vertex = stoi(indices[0]);
+        int index = vertex > 0 ? vertex - 1 : (int)vertices.size() + vertex;
+
+        if(index < 0 || index >= (int)vertices.size()){
+          cerr << "Invalid OBJ vertex index" << endl;
+          return 1;
+        }
+
+        face.push_back(index);
+      }
+
+      for(size_t i = 1; i + 1 < face.size(); i++){
+        triangles.push_back(Triangle{
+          vertices[face[0]], vertices[face[i]], vertices[face[i + 1]]
+        });
+      }
+    }
   }
+
+  cout << "Loaded " << triangles.size() << " triangles" << endl;
+  if(triangles.empty()) return 1;
 
 
 
@@ -34,18 +80,19 @@ int main()
   // cout << temp << endl;
 
   /// Width of the final image
-  const int w = 640;
+  const int w = 960;
 
   /// Height of the final image
-  const int h = 640;
+  const int h = 960;
 
   /// The 1d array for storing the pixel we have generated
   unsigned char pixels[w * h * 3];
 
-  Triangle triangle = Triangle{Vector3{-1, 1, 0}, Vector3{-1, -1, 0}, Vector3{1, -1, 0}};
-  Triangle triangle2 = Triangle{Vector3{1, 1, .5}, Vector3{-1, -1, -.5}, Vector3{1, -1, .5}};
+  // Triangle triangle = Triangle{Vector3{-1, 1, 0}, Vector3{-1, -1, 0}, Vector3{1, -1, 0}};
+  // Triangle triangle2 = Triangle{Vector3{1, 1, .5}, Vector3{-1, -1, -.5}, Vector3{1, -1, .5}};
 
-  vector<Triangle> triangles = {triangle, triangle2};
+  // vector<Triangle> triangles = {triangle, triangle2};
+  // Four triangular sides of the pyramid
  
   
   Vector3 background_color = Vector3{16, 27, 56};
@@ -70,12 +117,20 @@ int main()
       unsigned char b = background_color.z;
 
       // How do I ray trace?
-      Vector3 camera_origin = Vector3{0, 0, 1};
+            // How do I ray trace?
+      Vector3 camera_origin = Vector3{3, 2, 4}; // CHANGED: Show three sides of the cube
       Vector3 camera_look_at = Vector3{0, 0, 0};
       Vector3 camera_up = Vector3{0, 1, 0};
 
-      Vector3 target{
-          x / (float)w * 2 - 1, -(y / (float)h * 2 - 1), 0};
+      // ADDED: Calculate camera direction and axes
+      Vector3 forward = (camera_look_at - camera_origin).normalize();
+      Vector3 camera_right = forward.cross(camera_up).normalize();
+      Vector3 camera_true_up = camera_right.cross(forward).normalize();
+
+      // CHANGED: Zoom in to make the cube larger
+      Vector3 target = camera_origin + forward
+          + camera_right * (((x + 0.5f) / w * 2.0f - 1.0f) * 0.6f)
+          + camera_true_up * ((1.0f - (y + 0.5f) / h * 2.0f) * 0.6f);
 
       // cout<<"One"<<endl;
       Vector3 temp = (target - camera_origin);
@@ -87,9 +142,10 @@ int main()
 
       float closest_t = 1000000;
 
+      int triangle_number = 0; // ADDED: Track triangles for different shades
       for (const Triangle &triangle : triangles)
       {
-
+        triangle_number++; // ADDED: Count each triangle
         // Find where we hit the plane
         Vector3 edge_one = triangle.one - triangle.two;
         Vector3 edge_two = triangle.three - triangle.two;
@@ -97,7 +153,13 @@ int main()
         Vector3 abc = p.normalize();
         float d = -abc.dot(triangle.one);
 
-        float t = -(abc.dot(camera_origin) + d) / abc.dot(ray);
+        // ADDED: Avoid division by zero for parallel rays
+        float denominator = abc.dot(ray);
+        if(abs(denominator) < 0.000001f) continue;
+        float t = -(abc.dot(camera_origin) + d) / denominator;
+
+        // ADDED: Ignore intersections behind the camera
+        if(t <= 0) continue;
 
         if(t > closest_t)
           continue;
@@ -133,10 +195,25 @@ int main()
         {
           // I'm in the triangle
           closest_t = t;
+          // CHANGED: Three face colors with subtle triangle shading
+          Vector3 face_color;
 
-          r = 255 * u + 255 * v + 255 * a;
-          g = 140 * u + 0 * v + 255 * a;
-          b = 0 * u + 0 * v + 0 * a;
+          if(abs(abc.y) > 0.5f)
+            face_color = Vector3{255, 166, 64}; // ADDED: Orange
+
+          else if(abs(abc.x) > 0.5f)
+            face_color = Vector3{62, 204, 219}; // ADDED: Cyan
+
+          else
+            face_color = Vector3{170, 118, 232}; // ADDED: Purple
+
+          // ADDED: Give alternating triangles slightly different shades
+          float shade = (triangle_number % 2 == 0) ? 0.92f : 1.0f;
+
+          r = (unsigned char)(face_color.x * shade);
+          g = (unsigned char)(face_color.y * shade);
+          b = (unsigned char)(face_color.z * shade);
+           
         }
       }
 
